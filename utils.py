@@ -3,7 +3,6 @@ from bisect import bisect_right
 from copy import deepcopy
 import csv
 from datetime import datetime
-from functools import lru_cache
 from pathlib import Path
 import traceback
 from typing import List
@@ -30,19 +29,54 @@ from .var import (
 
 TALENT_QUEST_NAME = ("火", "水", "风", "光", "暗")
 
+# 公主骑士等级经验表（rank_exp.csv）的加载状态：
+# 表能用就缓存住；读不到或内容异常时返回 None，让调用方降级显示「未知」，
+# 而不是抛异常把整条查询拖垮。失败不做永久缓存，文件补回去后下次查询会自动重试。
+_knight_exp = None
+_knight_exp_ready = False
+_knight_exp_warned = False
 
-@lru_cache(maxsize=128)
+
 def _knight_rank_exp():
-    with open(
-        Path(__file__).with_name("rank_exp.csv"), encoding="utf-8", newline=""
-    ) as fp:
-        rows = csv.reader(fp)
-        next(rows)
-        return tuple(int(row[1]) for row in rows)
+    global _knight_exp, _knight_exp_ready, _knight_exp_warned
+    if _knight_exp_ready:
+        return _knight_exp
+
+    exp_path = Path(__file__).with_name("rank_exp.csv")
+    exp = None
+    try:
+        with open(exp_path, encoding="utf-8", newline="") as fp:
+            rows = [row for row in csv.reader(fp) if len(row) > 1]
+        # 首行是表头/校验标记，不是数据：只要第二列不是纯数字就当表头跳过。
+        # 这样表头被删掉、或换成别的标记，都不会把真正的「1 级」那条数据吃掉。
+        if rows and not rows[0][1].strip().isdigit():
+            rows = rows[1:]
+        exp = tuple(int(row[1]) for row in rows)
+        if not exp:
+            raise ValueError("表里没有任何数据行")
+        if any(exp[i] > exp[i + 1] for i in range(len(exp) - 1)):
+            raise ValueError("经验值不是递增的，文件可能被改坏")
+    except Exception:
+        if not _knight_exp_warned:
+            _knight_exp_warned = True
+            logger.error(
+                f"公主骑士等级表读取失败（{exp_path}），详细查询/深域查询里的等级会显示「未知」："
+                f"\n{traceback.format_exc()}"
+                "补回 rank_exp.csv 后无需重启，下一次查询会自动重新加载。"
+            )
+        return None
+
+    _knight_exp = exp
+    _knight_exp_ready = True
+    return _knight_exp
 
 
-def read_knight_exp_rank(target_value: int) -> int:
-    return max(1, bisect_right(_knight_rank_exp(), target_value))
+def read_knight_exp_rank(target_value: int):
+    """累计经验换算成公主骑士等级；经验表不可用时返回 None（调用方需按「未知」处理）"""
+    exp = _knight_rank_exp()
+    if exp is None:
+        return None
+    return max(1, bisect_right(exp, target_value))
 
 
 def get_platform_id(ev: CQEvent) -> int:
@@ -198,9 +232,10 @@ async def talent_query(data: dict):
             level = clear_count % 10 or 10
             talent_name = TALENT_QUEST_NAME[int(quest["talent_id"]) - 1]
             talent_progress.append(f"{talent_name}: {stage}-{level}")
+        knight_rank = read_knight_exp_rank(int(user_info["princess_knight_rank_total_exp"]))
         query = (
             f'{util.filt_message(str(user_info["user_name"]))}\n'
-            f'公主骑士等级{read_knight_exp_rank(int(user_info["princess_knight_rank_total_exp"]))}\n'
+            f'公主骑士等级{knight_rank if knight_rank is not None else "未知"}\n'
             f'深域：{" / ".join(talent_progress)}\n\n'
         )
     except Exception:

@@ -10,7 +10,7 @@ from hoshino import priv, Service
 from hoshino.config import SUPERUSERS
 from hoshino.typing import HoshinoBot, CQEvent
 from nonebot import NoticeSession, MessageSegment
-from .utils import bind_pcrid, detial_query, get_platform_id, get_tw_platform, query_loop, talent_query, user_query, get_qid
+from .utils import bind_pcrid, detial_query, get_platform_id, get_tw_platform, query_loop, talent_query, user_query, get_qid, read_knight_exp_rank
 from .query import login_all, query_all
 from .var import LoadBase, platform_dict, query_cache, talent_cache, queue_dict, private_dict, Platform, Priority
 from .tool import refresh_account
@@ -490,6 +490,10 @@ async def on_arena_schedule():
         logger.error(f"账号表刷新失败：\n{traceback.format_exc()}")
     if not count:
         logger.error("没有读到任何台服账号，自动推送无法启动，请运行 python check_account.py")
+
+    # 等级表缺失不会让插件挂掉，但详细查询的等级栏会变成「未知」，启动时先说清楚
+    if read_knight_exp_rank(0) is None:
+        logger.error("公主骑士等级表 rank_exp.csv 缺失或损坏，详细查询 / 深域查询里的等级将显示「未知」")
 
     try:
         await login_all()

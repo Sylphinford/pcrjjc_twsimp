@@ -283,13 +283,15 @@ def _generate_talent_pic_internal(data, knight_rank):
         quest_draw.text(xy=xy, text=quest, font=fnt, fill=rgb)
 
     knight_exp = int(data['user_info']['princess_knight_rank_total_exp'])
+    # 等级表缺失时按「未知」画，不能因为一个字段影响整张图
+    knight_rank_text = '未知' if knight_rank is None else str(knight_rank)
     knight_img = Image.open(path / 'img' / 'knight_rank.png').convert('RGBA').resize((517, 61))
     im.paste(im=knight_img, box=(701, 729), mask=knight_img)
     quest_draw.text(xy=(735, 740), text='公主骑士经验', font=fnt, fill=rgb_w)
     quest_draw.text(xy=(1035, 738), text=str(knight_exp), font=fnt, fill=rgb)
     im.paste(im=knight_img, box=(701, 849), mask=knight_img)
     quest_draw.text(xy=(725, 860), text='公主骑士RANK', font=fnt, fill=rgb_w)
-    quest_draw.text(xy=(1080, 858), text=str(knight_rank), font=fnt, fill=rgb)
+    quest_draw.text(xy=(1080, 858), text=knight_rank_text, font=fnt, fill=rgb)
     return im
 
 async def generate_support_pic(*args, **kwargs):
