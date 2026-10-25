@@ -29,6 +29,12 @@ from .var import (
 
 TALENT_QUEST_NAME = ("火", "水", "风", "光", "暗")
 
+# 上线提醒 LV1 的播报窗口（北京时间/UTC+8）：
+# 台服竞技场结算时间已改为 19:00，所以只在结算前半小时 18:30~18:59 播报。
+# 结算时间再变的话，只改这两行即可。
+ONLINE_NOTICE_HOUR = 18
+ONLINE_NOTICE_MINUTE = 30
+
 # 公主骑士等级经验表（rank_exp.csv）的加载状态：
 # 表能用就缓存住；读不到或内容异常时返回 None，让调用方降级显示「未知」，
 # 而不是抛异常把整条查询拖垮。失败不做永久缓存，文件补回去后下次查询会自动重试。
@@ -310,9 +316,10 @@ async def sendNotice(new: int, old: int, info: PCRBind, noticeType: int):
             cache[(info.pcrid, info.user_id, info.platform)][
                 2
             ] = old  # 间隔太短，不更新缓存
-        # 类型1，只在特定时间播报
+        # 类型1，只在结算前的特定时间播报（台服结算时间 19:00，窗口取前半小时）
         elif info.online_notice != 1 or (
-            (new % 86400 // 3600 + 8) % 24 == 14 and new % 3600 // 60 >= 30
+            (new % 86400 // 3600 + 8) % 24 == ONLINE_NOTICE_HOUR
+            and new % 3600 // 60 >= ONLINE_NOTICE_MINUTE
         ):
             onlineNotice = True
 
