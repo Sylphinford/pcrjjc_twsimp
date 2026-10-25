@@ -1,0 +1,9 @@
+msgpack~=1.0.2
+nonebot~=1.8.4
+Pillow~=9.0.1
+pycryptodome~=3.14.1
+requests~=2.27.1
+httpx
+zhconv~=1.4.3
+sqlmodel
+aiosqlite
